@@ -48,7 +48,7 @@ func TestInspectProcessContainerContainsLabel(t *testing.T) {
 
 	testCase.Command = func(data test.Data, helpers test.Helpers) test.TestableCommand {
 		containerName := data.Labels().Get("containerName")
-		return helpers.Command("inspect", containerName, "--format", "{{json .Config.Labels}}")
+		return helpers.Command("inspect", containerName)
 	}
 
 	testCase.Expected = func(data test.Data, helpers test.Helpers) *test.Expected {
