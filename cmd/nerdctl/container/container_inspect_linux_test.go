@@ -724,17 +724,7 @@ func TestContainerInspectDevices(t *testing.T) {
 }
 
 func TestContainerInspectBlkioSettings(t *testing.T) {
-	// See https://github.com/containerd/nerdctl/issues/4185
-	// It is unclear if this is truly a kernel version problem, a runc issue, or a distro (EL9) issue.
-	// For now, disable the test unless on a recent kernel.
-	testutil.RequireKernelVersion(t, ">= 6.0.0-0")
-
-	lo, err := loopback.New(4096)
-	if err != nil {
-		err = fmt.Errorf("cannot find a loop device: %w", err)
-		t.Fatal(err)
-	}
-	defer lo.Close()
+	var lo *loopback.Loopback
 
 	testCase := nerdtest.Setup()
 
@@ -746,6 +736,18 @@ func TestContainerInspectBlkioSettings(t *testing.T) {
 	)
 
 	testCase.Setup = func(data test.Data, helpers test.Helpers) {
+		// See https://github.com/containerd/nerdctl/issues/4185
+		// It is unclear if this is truly a kernel version problem, a runc issue, or a distro (EL9) issue.
+		// For now, disable the test unless on a recent kernel.
+		testutil.RequireKernelVersion(t, ">= 6.0.0-0")
+
+		var err error
+		lo, err = loopback.New(4096)
+		if err != nil {
+			err = fmt.Errorf("cannot find a loop device: %w", err)
+			t.Fatal(err)
+		}
+
 		const (
 			weight    = 500
 			readBps   = 1048576
@@ -769,6 +771,13 @@ func TestContainerInspectBlkioSettings(t *testing.T) {
 		data.Labels().Set("readIops", strconv.Itoa(readIops))
 		data.Labels().Set("writeBps", strconv.Itoa(writeBps))
 		data.Labels().Set("writeIops", strconv.Itoa(writeIops))
+	}
+
+	testCase.Cleanup = func(data test.Data, helpers test.Helpers) {
+		helpers.Anyhow("rm", "-f", testutil.Identifier(t))
+		if lo != nil {
+			lo.Close()
+		}
 	}
 
 	testCase.Command = test.Command("inspect", testutil.Identifier(t))
@@ -810,10 +819,6 @@ func TestContainerInspectBlkioSettings(t *testing.T) {
 				assert.Equal(t, uint64(writeIops), inspect.HostConfig.BlkioDeviceWriteIOps[0].Rate)
 			},
 		}
-	}
-
-	testCase.Cleanup = func(data test.Data, helpers test.Helpers) {
-
 	}
 
 	testCase.Run(t)
